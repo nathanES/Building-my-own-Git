@@ -31,19 +31,21 @@ public class GitCatFileCommand
 
     private void PrettyPrint(string blobSha)
     {
-        string filePath = PathFile.PATH_TO_GIT_OBJECTS_FOLDER + blobSha[..2] + "/" + blobSha[2..];
-        if (!File.Exists(filePath))
+        string blobPath = PathFile.PATH_TO_GIT_OBJECTS_FOLDER + blobSha[..2] + "/" + blobSha[2..];
+        if (!File.Exists(blobPath))
         {
             Console.WriteLine($"{nameof(blobSha)} does not exist");
             return;
         }
 
-        Memory<byte> uncompressedStreamMemory = UncompressFile(filePath);
-        int nullByteIndex = uncompressedStreamMemory.Span.IndexOf((byte)0);
-        int spaceByteIndex = uncompressedStreamMemory.Span.IndexOf((byte)' ');
-        string blobType = Encoding.UTF8.GetString(uncompressedStreamMemory[0..spaceByteIndex].Span);
-        string blobContent = Encoding.UTF8.GetString(uncompressedStreamMemory[(nullByteIndex + 1)..].Span);
-        if (int.TryParse(Encoding.UTF8.GetString(uncompressedStreamMemory[(spaceByteIndex + 1)..nullByteIndex].Span),
+        Memory<byte> uncompressedBlob = UncompressBlob(blobPath);
+        int nullByteIndex = uncompressedBlob.Span.IndexOf((byte)0);
+        int spaceByteIndex = uncompressedBlob.Span.IndexOf((byte)' ');
+        string blobType = Encoding.UTF8.GetString(uncompressedBlob[0..spaceByteIndex].Span);
+        // if(blobType == "toto")
+        Console.WriteLine("test");
+        string blobContent = Encoding.UTF8.GetString(uncompressedBlob[(nullByteIndex + 1)..].Span);
+        if (int.TryParse(Encoding.UTF8.GetString(uncompressedBlob[(spaceByteIndex + 1)..nullByteIndex].Span),
                 out int blobLength)
             && blobLength != blobContent.Length)
         {
@@ -54,7 +56,7 @@ public class GitCatFileCommand
         Console.Write(blobContent);
     }
 
-    private Memory<byte> UncompressFile(string filePath)
+    private Memory<byte> UncompressBlob(string filePath)
     {
         using Stream compressedStream = new ZLibStream(File.OpenRead(filePath), CompressionMode.Decompress);
         using MemoryStream uncompressedStream = new();
