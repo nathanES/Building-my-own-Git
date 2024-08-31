@@ -1,28 +1,13 @@
-using System;
-using System.IO;
+using Cocona;
+using codecrafters_git.Commands;
 
-if (args.Length < 1)
+var builder = CoconaApp.CreateBuilder(configureOptions: options =>
 {
-    Console.WriteLine("Please provide a command.");
-    return;
-}
+    options.TreatPublicMethodsAsCommands = false;
+} );
 
-// You can use print statements as follows for debugging, they'll be visible when running tests.
-Console.WriteLine("Logs from your program will appear here!");
+var app = builder.Build();
+app.AddCommands<GitInitCommand>();
+app.AddCommands<GitCatFileCommand>();
 
-string command = args[0];
-
-if (command == "init")
-{
-    // Uncomment this block to pass the first stage
-    //
-    Directory.CreateDirectory(".git");
-    Directory.CreateDirectory(".git/objects");
-    Directory.CreateDirectory(".git/refs");
-    File.WriteAllText(".git/HEAD", "ref: refs/heads/main\n");
-    Console.WriteLine("Initialized git directory");
-}
-else
-{
-    throw new ArgumentException($"Unknown command {command}");
-}
+app.Run();
