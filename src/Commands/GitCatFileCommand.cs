@@ -15,8 +15,6 @@ public class GitCatFileCommand
     [Command("cat-file", Description = "CatFileCommand")]
     public void CatFile([Option('p', Description = "BlobSha")] string blobSha)
     {
-        Console.WriteLine(DateTime.Now);
-        Console.WriteLine("BlobSha : " + blobSha);
         if (IsValidBlobSha(blobSha))
             PrettyPrint(blobSha);
     }
@@ -25,7 +23,6 @@ public class GitCatFileCommand
 
     private void PrettyPrint(string compressedBlob)
     {
-        Console.WriteLine("Current Directory : " + Directory.GetCurrentDirectory());
         string path = PathFiles.PATH_TO_GIT_OBJECTS_FOLDER + compressedBlob[..2] + "/" + compressedBlob[2..];
         if (!File.Exists(path))
         {
@@ -49,8 +46,6 @@ public class GitCatFileCommand
             return;
         }
         
-        Console.WriteLine(blobType);
-        Console.WriteLine(blobLength);
         Console.Write(blobContent);
     }
 }
