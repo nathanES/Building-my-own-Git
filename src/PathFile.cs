@@ -1,9 +1,12 @@
 namespace codecrafters_git;
 
-public static class PathFiles
+public static class PathFile
 {
-   // public const string PATH_TO_GIT_FOLDER = "../../../.git/";
+#if DEBUG
+   public const string PATH_TO_GIT_FOLDER = "../../../.git/";
+#else
    public const string PATH_TO_GIT_FOLDER = ".git/";
+#endif
 
    public const string PATH_TO_GIT_OBJECTS_FOLDER = PATH_TO_GIT_FOLDER + "objects/";
 }
