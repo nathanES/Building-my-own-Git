@@ -6,26 +6,27 @@ using System.Text;
 using System.Text.Json;
 using codecrafters_git.ResultPattern;
 using codecrafters_git.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace codecrafters_git.Commands;
 
 public class GitCatFileCommand
 {
-    private readonly ICustomWriter _customWriter;
+    private readonly ILogger _logger;
     private const int _blobShaLength = 40;
     private const string _blobType = "blob";
-    public GitCatFileCommand(ICustomWriter customWriter)
+    public GitCatFileCommand(ILogger logger)
     {
-        _customWriter = customWriter;
+        _logger = logger;
     }
 
-    [Command("cat-file", Description = "CatFileCommand")]
-    public void CatFile([Option('p', Description = "BlobSha")] string blobSha)
+    [Command("cat-file", Description = "Git cat-file command")]
+    public void GitCatFile([Option('p', Description = "BlobSha")] string blobSha)
     {
         var catFileTreatmentResult = PrettyPrintTreatment(blobSha);
         if(catFileTreatmentResult.IsFailure)
         {
-            _customWriter.WriteLine(catFileTreatmentResult.Errors);
+            _logger.LogError(catFileTreatmentResult.Errors);
             return;
         }
     }
@@ -41,7 +42,7 @@ public class GitCatFileCommand
     {
         return ValidateBlobShaFormat(blobSha)
             .Bind(_ => ConstructBlobPath(blobSha))
-            .Bind(ValidateBlobPresence);
+            .Bind(ValidateBlobExist);
     }
     private Result<None> ValidateBlobShaFormat(string blobSha)
     {
@@ -52,10 +53,10 @@ public class GitCatFileCommand
     }
     private Result<string> ConstructBlobPath(string blobSha)
     {
-        string blobPath =  Path.Combine(PathFile.PATH_TO_GIT_OBJECTS_FOLDER, blobSha[..2], blobSha[2..]);
+        string blobPath =  Path.Combine(FilePath.TO_GIT_OBJECTS_FOLDER, blobSha[..2], blobSha[2..]);
         return Result<string>.Create(blobPath);
     }
-    private Result<string> ValidateBlobPresence(string blobPath)
+    private Result<string> ValidateBlobExist(string blobPath)
     {
         if (!File.Exists(blobPath))
             return Result<string>.Create(GitCatFileErrors.BlobNotFound);
@@ -82,7 +83,7 @@ public class GitCatFileCommand
     }
     private Result<Memory<byte>> TryDecompressBlob(string filePath)
     {
-        return TryExecute(() =>
+        return Result<Memory<byte>>.TryExecute(() =>
         {
             using Stream compressedStream = new ZLibStream(File.OpenRead(filePath), CompressionMode.Decompress);
             using MemoryStream uncompressedStream = new();
@@ -131,17 +132,17 @@ public class GitCatFileCommand
         return Result<None>.Create(None.Value);
     } 
 
-    private Result<T> TryExecute<T>(Func<T> action, Func<Exception, Error> errorHandler)
-    {
-        try
-        {
-            return Result<T>.Create(action());
-        }
-        catch (Exception ex)
-        {
-            return Result<T>.Create(errorHandler(ex));
-        }
-    }
+    // private Result<T> TryExecute<T>(Func<T> action, Func<Exception, Error> errorHandler)
+    // {
+    //     try
+    //     {
+    //         return Result<T>.Create(action());
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return Result<T>.Create(errorHandler(ex));
+    //     }
+    // }
 }
 
 public static class GitCatFileErrors

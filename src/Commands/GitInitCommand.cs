@@ -1,14 +1,18 @@
 using Cocona;
+using Microsoft.Extensions.Logging;
 
 namespace codecrafters_git.Commands;
 
 public class GitInitCommand
 {
-    public GitInitCommand()
+    private readonly ILogger _logger;
+
+    public GitInitCommand(ILogger logger)
     {
+        _logger = logger;
     }
 
-    [Command("init", Description = "Init")]
+    [Command("init", Description = "git init command")]
     public void GitInit()
     {
         Directory.CreateDirectory(".git");

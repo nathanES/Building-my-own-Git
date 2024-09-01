@@ -107,4 +107,15 @@ public class Result<T>
 
         return func(Response);
     }
+    public static Result<T> TryExecute<T>(Func<T> action, Func<Exception, Error> errorHandler)
+    {
+        try
+        {
+            return Result<T>.Create(action());
+        }
+        catch (Exception ex)
+        {
+            return Result<T>.Create(errorHandler(ex));
+        }
+    }
 }
