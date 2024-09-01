@@ -32,66 +32,17 @@ public class GitCatFileCommand
 
     private Result<None> PrettyPrintTreatment(string blobSha)
     {
+        return ValidateAndRetrieveBlobPath(blobSha)
+            .Bind(TryDecompressBlob)
+            .Bind(ValidateAndExtractBlobContent)
+            .Bind(PrintBlobContent);
+    }
+    private Result<string> ValidateAndRetrieveBlobPath(string blobSha)
+    {
         return ValidateBlobShaFormat(blobSha)
             .Bind(_ => ConstructBlobPath(blobSha))
-            .Bind(ValidateBlobPresence)
-            .Bind(blobPath => TryUncompressBlob(blobPath)
-                    .Bind(uncompressedBlob => CreateContextAndPrint(blobPath, uncompressedBlob)));
-        
-        // var validatonResult = ValidateBlobShaFormat(blobSha)
-        //     .Bind(_ => ConstructBlobPath(blobSha))
-        //     .Bind(blobPath => ValidateBlobPresence(blobPath))  // Use the blobPath correctly
-        //     .Bind(TryUncompressBlob(blobPath))
-        //     .Bind(uncompressedBlob => ValidateAndPrintBlob(uncompressedBlob, blobSha));
-        //
-        // return validationResult;
-        //
-        //
-        // var validationBlobShaFormatResult = ValidateBlobShaFormat(blobSha);
-        // if (validationBlobShaFormatResult.IsFailure)
-        //     return validationBlobShaFormatResult;
-        //
-        // var blobPath = ConstructBlobPath(blobSha);
-        //
-        // var validationBlobPresenceResult = ValidateBlobPresence(blobPath);
-        // if (validationBlobPresenceResult.IsFailure)
-        //     return validationBlobPresenceResult;
-        //
-        // var uncompressResult = TryUncompressBlob(blobPath);
-        // if (uncompressResult.IsFailure)
-        //     return Result<None>.Create(uncompressResult.Error);
-        //
-        // Memory<byte> uncompressedBlob = uncompressResult.Response;
-        // int nullByteIndex = uncompressedBlob.Span.IndexOf((byte)0);
-        // int spaceByteIndex = uncompressedBlob.Span.IndexOf((byte)' ');
-        // string blobType = Encoding.UTF8.GetString(uncompressedBlob[0..spaceByteIndex].Span);
-        //
-        // var validationBlobTypeResult = ValidateBlobType(blobType);
-        // if (validationBlobTypeResult.IsFailure)
-        //     return validationBlobTypeResult;
-        //
-        // string blobContent = Encoding.UTF8.GetString(uncompressedBlob[(nullByteIndex + 1)..].Span);
-        // string headerBlobLength = Encoding.UTF8.GetString(uncompressedBlob[(spaceByteIndex + 1)..nullByteIndex].Span);
-        //
-        // var validationBlobLengthResult = ValidateBlobLength(blobContent.Length, headerBlobLength);
-        // if (validationBlobLengthResult.IsFailure)
-        //     return validationBlobLengthResult;
-        //
-        // Console.Write(blobContent);
-        // return Result<None>.Create(None.Value); 
+            .Bind(ValidateBlobPresence);
     }
-    private Result<None> CreateContextAndPrint(string blobPath, Memory<byte> uncompressedBlob)
-    {
-        var context = new BlobProcessingContext(blobPath, uncompressedBlob);
-        return ValidateAndPrintBlob(context);
-    }
-
-    private Result<string> ConstructBlobPath(string blobSha)
-    {
-        string blobPath =  Path.Combine(PathFile.PATH_TO_GIT_OBJECTS_FOLDER, blobSha[..2], blobSha[2..]);
-        return Result<string>.Create(blobPath);
-    }
-
     private Result<None> ValidateBlobShaFormat(string blobSha)
     {
         if (blobSha?.Length != _blobShaLength)
@@ -99,13 +50,19 @@ public class GitCatFileCommand
         
         return Result<None>.Create(None.Value);
     }
-    private Result<string> ValidateBlobPresence(string pathToBlobFile)
+    private Result<string> ConstructBlobPath(string blobSha)
     {
-        if (!File.Exists(pathToBlobFile))
+        string blobPath =  Path.Combine(PathFile.PATH_TO_GIT_OBJECTS_FOLDER, blobSha[..2], blobSha[2..]);
+        return Result<string>.Create(blobPath);
+    }
+    private Result<string> ValidateBlobPresence(string blobPath)
+    {
+        if (!File.Exists(blobPath))
             return Result<string>.Create(GitCatFileErrors.BlobNotFound);
 
-        return Result<string>.Create(pathToBlobFile);
+        return Result<string>.Create(blobPath);
     }
+
     private Result<None> ValidateBlobType(string blobType)
     {
         if (blobType != _blobType)
@@ -116,66 +73,83 @@ public class GitCatFileCommand
     private Result<None> ValidateBlobLength(int actualBlobLength, string headerBlobLength )
     {
         if (!int.TryParse(headerBlobLength, out int blobLength))
-            return Result<None>.Create(GitCatFileErrors.BlobCompositionInvalid);
+            return Result<None>.Create(GitCatFileErrors.BlobHeaderInvalid);
         
         if (actualBlobLength != blobLength)
             return Result<None>.Create(GitCatFileErrors.BlobLengthInvalid);
         
         return Result<None>.Create(None.Value); 
     }
-    private Result<None> ValidateAndPrintBlob(BlobProcessingContext context)
+    private Result<Memory<byte>> TryDecompressBlob(string filePath)
     {
-        int nullByteIndex = context.UncompressedBlob.Span.IndexOf((byte)0);
-        int spaceByteIndex = context.UncompressedBlob.Span.IndexOf((byte)' ');
-
-        string blobType = Encoding.UTF8.GetString(context.UncompressedBlob[..spaceByteIndex].Span);
-        var validationBlobTypeResult = ValidateBlobType(blobType);
-        if (validationBlobTypeResult.IsFailure)
-            return validationBlobTypeResult;
-
-        string blobContent = Encoding.UTF8.GetString(context.UncompressedBlob[(nullByteIndex + 1)..].Span);
-        string headerBlobLength = Encoding.UTF8.GetString(context.UncompressedBlob[(spaceByteIndex + 1)..nullByteIndex].Span);
-
-        var validationBlobLengthResult = ValidateBlobLength(blobContent.Length, headerBlobLength);
-        if (validationBlobLengthResult.IsFailure)
-            return validationBlobLengthResult;
-
-        Console.Write(blobContent);
-        return Result<None>.Create(None.Value);
-    }
-    private Result<Memory<byte>> TryUncompressBlob(string filePath)
-    {
-        try
+        return TryExecute(() =>
         {
             using Stream compressedStream = new ZLibStream(File.OpenRead(filePath), CompressionMode.Decompress);
             using MemoryStream uncompressedStream = new();
             compressedStream.CopyTo(uncompressedStream);
-            return Result<Memory<byte>>.Create(new Memory<byte>(uncompressedStream.GetBuffer())[..(int)uncompressedStream.Length]);
+            return new Memory<byte>(uncompressedStream.GetBuffer())[..(int)uncompressedStream.Length];
+        }, ex => GitCatFileErrors.DecompressionFailed(ex.Message));
+    }
+    private Result<string> ValidateAndExtractBlobContent(Memory<byte> uncompressedBlob)
+    {
+        var decomposeResult = DecomposeBlob(uncompressedBlob);
+        if (decomposeResult.IsFailure)
+            return Result<string>.Create(decomposeResult.Errors);
+        
+        var (blobType, blobContent, blobLength) = decomposeResult.Response;
+
+        var validationBlobTypeResult = ValidateBlobType(blobType);
+        if (validationBlobTypeResult.IsFailure)
+            return Result<string>.Create(validationBlobTypeResult.Errors);
+
+        var validationBlobLengthResult = ValidateBlobLength(blobContent.Length, blobLength);
+        if (validationBlobLengthResult.IsFailure)
+            return Result<string>.Create(validationBlobLengthResult.Errors);
+
+        return Result<string>.Create(blobContent);
+    }
+    private Result<(string BlobType, string BlobContent, string BlobLength)> DecomposeBlob(Memory<byte> uncompressedBlob)
+    {
+        int nullByteIndex = uncompressedBlob.Span.IndexOf((byte)0);
+        int spaceByteIndex = uncompressedBlob.Span.IndexOf((byte)' ');
+
+        if (nullByteIndex < 0 || spaceByteIndex < 0 || spaceByteIndex >= nullByteIndex)
+        {
+            return Result<(string, string, string)>.Create(GitCatFileErrors.BlobHeaderInvalid);
+        }
+
+        string blobType = Encoding.UTF8.GetString(uncompressedBlob[..spaceByteIndex].Span);
+        string blobLength = Encoding.UTF8.GetString(uncompressedBlob[(spaceByteIndex + 1)..nullByteIndex].Span);
+        string blobContent = Encoding.UTF8.GetString(uncompressedBlob[(nullByteIndex + 1)..].Span);
+
+        return Result<(string, string, string)>.Create((blobType, blobContent, blobLength));
+
+    }
+    private Result<None> PrintBlobContent(string blobContent)
+    {
+        Console.Write(blobContent);
+        return Result<None>.Create(None.Value);
+    } 
+
+    private Result<T> TryExecute<T>(Func<T> action, Func<Exception, Error> errorHandler)
+    {
+        try
+        {
+            return Result<T>.Create(action());
         }
         catch (Exception ex)
         {
-            return Result<Memory<byte>>.Create(GitCatFileErrors.DecompressionFailed(ex.Message));
+            return Result<T>.Create(errorHandler(ex));
         }
     }
 }
 
 public static class GitCatFileErrors
 {
-    public static readonly Error InvalidShaFormat = new Error("InvalidShaFormat", "The SHA-1 hash must be 40 characters long.");
-    public static readonly Error BlobNotFound = new Error("BlobNotFound", "The object with SHA-1 does not exist.");
-    public static readonly Error BlobTypeInvalid = new Error("BlobTypeInvalid", "The blob don't have a type valid.");
-    public static readonly Error BlobLengthInvalid = new Error("BlobLengthInvalid", "The blob don't have a length valid.");
-    public static readonly Error BlobCompositionInvalid = new Error("BlobCompositionInvalid", "The blob don't have a good composition.");
+    public static readonly Error InvalidShaFormat = new Error("InvalidShaFormat", "The SHA-1 hash must be exactly 40 characters long.");
+    public static readonly Error BlobNotFound = new Error("BlobNotFound", "The object with the specified SHA-1 hash could not be found.");
+    public static readonly Error BlobTypeInvalid = new Error("BlobTypeInvalid", "The object is not a valid 'blob' type.");
+    public static readonly Error BlobLengthInvalid = new Error("BlobLengthInvalid", "The blob's content length does not match the expected length.");
+    public static readonly Error BlobHeaderInvalid = new Error("BlobHeaderInvalid", "The blob's header is malformed.");
     public static Error DecompressionFailed(string message) => new Error("DecompressionFailed", $"Failed to decompress the blob: {message}");
-}
-public class BlobProcessingContext
-{
-    public string BlobPath { get; }
-    public Memory<byte> UncompressedBlob { get; }
-
-    public BlobProcessingContext(string blobPath, Memory<byte> uncompressedBlob)
-    {
-        BlobPath = blobPath;
-        UncompressedBlob = uncompressedBlob;
-    }
 }
