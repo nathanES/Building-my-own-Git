@@ -20,7 +20,7 @@ public class GitHashObjectCommand
 
     [Command("hash-object", Description = "Git hash-object command")]
     public void GitHashObject([Argument(Description = "File Path")] string filePath,
-        [Option('w', Description = "write  to the objects directory")] bool shouldWrite)
+        [Option('w', Description = "write to the objects directory")] bool shouldWrite)
     {
         _logger.LogDebug(Directory.GetCurrentDirectory());
 

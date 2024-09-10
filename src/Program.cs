@@ -27,4 +27,5 @@ var app = builder.Build();
 app.AddCommands<GitInitCommand>();
 app.AddCommands<GitCatFileCommand>();
 app.AddCommands<GitHashObjectCommand>();
+app.AddCommands<GitLsTreeCommand>();
 app.Run();
