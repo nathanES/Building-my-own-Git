@@ -101,10 +101,10 @@ public class GitLsTreeCommand
             return Result<string>.Create(validationTypeResult.Errors);
         _logger.LogDebug("Validation Type OK");
 
-        var validationLengthResult = ValidateLength(content.Length, length);
-        if (validationLengthResult.IsFailure)
-            return Result<string>.Create(validationLengthResult.Errors);
-        _logger.LogDebug("Validation Length OK");
+        // var validationLengthResult = ValidateLength(content.Length, length);
+        // if (validationLengthResult.IsFailure)
+        //     return Result<string>.Create(validationLengthResult.Errors);
+        // _logger.LogDebug("Validation Length OK");
         
         return Result<string>.Create(content);
     }
