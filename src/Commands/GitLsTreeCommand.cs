@@ -98,7 +98,7 @@ public class GitLsTreeCommand
     }
     private Result<None> ValidateType(string type)
     {
-        if (type != _treeType)
+        if (type != _treeType) 
             return Result<None>.Create(GitLsTreeErrors.TypeInvalid);
 
         return Result<None>.Create(None.Value);
