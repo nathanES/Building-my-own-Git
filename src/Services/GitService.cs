@@ -48,15 +48,18 @@ public class GitService : IGitService
     public async Task<Result<None>> WriteInDataBaseAsync(byte[] data)
     {
         return await CalculateSha(data)
-            .Bind(CreateDirectory)
-            .BindAsync(path => TryWriteDataAsync(path, data));
+            .BindAsync(sha => CreateDirectory(sha)
+            .BindAsync(path => TryWriteDataAsync(path, sha[2..], data)));
     }
 
     private Result<string> CreateDirectory(string sha)
     {
-        string path = Path.Combine(_pathToGitObjectFolder, sha[..2]); 
-        Directory.CreateDirectory(path);
-        return Result<string>.Success(path);
+        string directoryPath = Path.Combine(_pathToGitObjectFolder, sha[..2]); 
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+        return Result<string>.Success(directoryPath);
     }
 
     public async Task<Result<Blob>> GenerateBlobAsync(string path)
@@ -152,11 +155,11 @@ public class GitService : IGitService
             .Bind(ValidateExist);
     }
 
-    private async Task<Result<None>> TryWriteDataAsync(string path, byte[] data)
+    private async Task<Result<None>> TryWriteDataAsync(string path,string fileName, byte[] data)
     {
         return ResultExtensions.TryExecute(() =>
         {
-            using var fileStream = new FileStream(path, FileMode.Create);
+            using var fileStream = new FileStream(Path.Combine(path,fileName), FileMode.CreateNew);
             using ZLibStream zLibStream = new ZLibStream(fileStream, CompressionMode.Compress);
             zLibStream.Write(data, 0, data.Length);
             _logger.LogDebug($"File Written to : {path}");
