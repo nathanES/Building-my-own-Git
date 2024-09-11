@@ -36,7 +36,7 @@ public class GitCatFileCommand
        var result = await _gitService.GetBlobAsync(blobSha)
             .TapAsync(taskResultBlob =>
             {
-                Console.WriteLine(Encoding.UTF8.GetString(taskResultBlob.Response.Content));
+                Console.Write(Encoding.UTF8.GetString(taskResultBlob.Response.Content));
             });
        return result.Bind(_ => Result<None>.Success(None.Value));
     }
