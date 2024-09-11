@@ -71,7 +71,10 @@ public class GitService : IGitService
         try
         {
             var tree = new Tree();
-            int index = 0;
+            var headerEndIndex = Array.IndexOf(data, (byte)0);
+            string header = Encoding.UTF8.GetString(data, 0, headerEndIndex);
+            string[] headerParts = header.Split(' ');
+            int index = headerEndIndex+1;
 
             while (index < data.Length)
             {
