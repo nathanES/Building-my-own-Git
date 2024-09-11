@@ -46,7 +46,7 @@ public class GitHashObjectCommand
                 _logger.LogDebug(
                     $"Generated Blob : {JsonSerializer.Serialize(blobResult.Response, new JsonSerializerOptions() { WriteIndented = true })}"))
             .TapErrorAsync(LogError)
-            .Bind(blob => shouldWrite ? _gitService.WriteInDataBaseAsync(blob.Sha, blob.Content).Bind(_=> Result<string>.Success(blob.Sha))
+            .Bind(blob => shouldWrite ? _gitService.WriteBlobInDataBaseAsync(blob).Bind(_=> Result<string>.Success(blob.Sha))
                 : Result<string>.Success(blob.Sha));
     }
     
