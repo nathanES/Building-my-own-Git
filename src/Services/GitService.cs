@@ -48,9 +48,19 @@ public class GitService : IGitService
     public async Task<Result<None>> WriteBlobInDataBaseAsync(Blob blob)
     {
         return await CreateDirectory(blob.Sha)
-            .BindAsync(path => TryWriteDataAsync(path, blob.Sha[2..], blob.Content));
+            .BindAsync(path => AddBlobHeader(blob)
+            .BindAsync(data => TryWriteDataAsync(path, blob.Sha[2..], data)));
     }
 
+    private async Task<Result<byte[]>> AddBlobHeader(Blob blob)
+    {
+        var header = Encoding.UTF8.GetBytes($"{GitObjectType.Blob.Value} {blob.Content.Length}\0");    
+        
+        var result = new byte[header.Length + blob.Content.Length];
+        header.CopyTo(result, 0);
+        blob.Content.CopyTo(result, header.Length);
+        return Result<byte[]>.Success(result);
+    }
     private Result<string> CreateDirectory(string sha)
     {
         string directoryPath = Path.Combine(_pathToGitObjectFolder, sha[..2]); 
