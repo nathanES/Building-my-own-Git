@@ -1,3 +1,4 @@
+using System.Text;
 using Cocona;
 using codecrafters_git.ResultPattern;
 using codecrafters_git.Services;
@@ -35,7 +36,7 @@ public class GitCatFileCommand
        var result = await _gitService.GetBlobAsync(blobSha)
             .TapAsync(taskResultBlob =>
             {
-                Console.WriteLine(taskResultBlob.Response.Content);
+                Console.WriteLine(Encoding.UTF8.GetString(taskResultBlob.Response.Content));
             });
        return result.Bind(_ => Result<None>.Success(None.Value));
     }
