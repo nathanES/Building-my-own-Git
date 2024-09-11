@@ -55,7 +55,6 @@ public class GitLsTreeCommand
 
     private void DisplayTreeName(Tree tree)
     {
-        //TODO do the display tree Name
         foreach (var entry in tree.Entries)
         {
             Console.WriteLine($"{entry.Path}");
