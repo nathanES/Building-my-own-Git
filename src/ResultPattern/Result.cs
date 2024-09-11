@@ -57,20 +57,10 @@ public class Result<T>
         }
     }
 
-    public static Result<T> Create(T response)
-    {
-        return new Result<T>(response);
-    }
-
-    public static Result<T> Create(Error error)
-    {
-        return new Result<T>(error);
-    }
-
-    public static Result<T> Create(List<Error> errors)
-    {
-        return new Result<T>(errors);
-    }
+    public static Result<T> Success(T response) => new Result<T>(response);
+    public static Result<T> Failure(Error error) => new Result<T>(error);
+    public static Result<T> Failure(List<Error> errors) => new Result<T>(errors);
+    
     private Result(T response)
     {
         Response = response;
@@ -100,22 +90,4 @@ public class Result<T>
         }
     }
     
-    public Result<U> Bind<U>(Func<T, Result<U>> func)
-    {
-        if (IsFailure)
-            return Result<U>.Create(Error);
-
-        return func(Response);
-    }
-    public static Result<T> TryExecute<T>(Func<T> action, Func<Exception, Error> errorHandler)
-    {
-        try
-        {
-            return Result<T>.Create(action());
-        }
-        catch (Exception ex)
-        {
-            return Result<T>.Create(errorHandler(ex));
-        }
-    }
 }

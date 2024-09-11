@@ -1,5 +1,7 @@
 using Cocona;
+using codecrafters_git;
 using codecrafters_git.Commands;
+using codecrafters_git.Services;
 using codecrafters_git.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,6 +24,11 @@ builder.Services.AddSingleton<ILogger>(logger => new ColorConsoleLogger(nameof(c
         { LogLevel.Critical, ConsoleColor.Red }
     }
 })));
+builder.Services.AddSingleton<IGitService, GitService>(serviceProvider =>
+{
+    var logger = serviceProvider.GetRequiredService<ILogger<GitService>>();
+    return new GitService(FilePath.TO_GIT_OBJECTS_FOLDER, logger);
+});
 var app = builder.Build();
 
 app.AddCommands<GitInitCommand>();
