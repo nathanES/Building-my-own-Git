@@ -28,7 +28,7 @@ public class ColorConsoleLogger(string name, Func<ColorConsoleLoggerConfiguratio
 
     public bool IsEnabled(LogLevel logLevel)
     {
-        return false;
+        // return false;
 #if DEBUG
         return true;
 #endif

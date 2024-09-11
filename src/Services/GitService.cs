@@ -56,7 +56,7 @@ public class GitService : IGitService
     {
         string path = Path.Combine(_pathToGitObjectFolder, sha[..2]); 
         Directory.CreateDirectory(path);
-        return Result<string>.Success(sha);
+        return Result<string>.Success(path);
     }
 
     public async Task<Result<Blob>> GenerateBlobAsync(string path)
