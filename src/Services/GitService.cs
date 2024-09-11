@@ -12,7 +12,7 @@ public interface IGitService
 {
     Task<Result<Blob>> GetBlobAsync(string sha);
     Task<Result<Tree>> GetTreeAsync(string sha);
-    Task<Result<None>> WriteInDataBaseAsync(byte[] data);
+    Task<Result<None>> WriteInDataBaseAsync(string sha, byte[] data);
     Task<Result<Blob>> GenerateBlobAsync(string path);
 }
 
@@ -45,11 +45,10 @@ public class GitService : IGitService
             .TapErrorAsync(error => _logger.LogError($"Error parsing blob: {error}"));
     }
 
-    public async Task<Result<None>> WriteInDataBaseAsync(byte[] data)
+    public async Task<Result<None>> WriteInDataBaseAsync(string sha, byte[] data)
     {
-        return await CalculateSha(data)
-            .BindAsync(sha => CreateDirectory(sha)
-            .BindAsync(path => TryWriteDataAsync(path, sha[2..], data)));
+        return await CreateDirectory(sha)
+            .BindAsync(path => TryWriteDataAsync(path, sha[2..], data));
     }
 
     private Result<string> CreateDirectory(string sha)
