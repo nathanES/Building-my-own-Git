@@ -86,12 +86,6 @@ public class GitService : IGitService
 
     public async Task<Result<Tree>> WriteTreeAsync(string path)
     {
-        _logger.LogDebug($"{nameof(path)} : {path}");
-        var validationResult = ValidateExist(path);
-        if (validationResult.IsFailure)
-            return Result<Tree>.Failure(validationResult.Errors);
-        _logger.LogDebug($"{nameof(validationResult)} : OK");
-
         var filesFullNameResult = await GetFilesFullName(path);
         if (filesFullNameResult.IsFailure)
             return Result<Tree>.Failure(filesFullNameResult.Errors);
