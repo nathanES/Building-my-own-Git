@@ -1,9 +1,12 @@
 using System.IO.Compression;
+using System.Net.Mime;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using codecrafters_git.ResultPattern;
+using Microsoft.CSharp.RuntimeBinder;
 using Microsoft.Extensions.Logging;
 
 namespace codecrafters_git.Services;
@@ -50,25 +53,27 @@ public class GitService : IGitService
     {
         return await CreateDirectory(blob.Sha)
             .BindAsync(path => AddBlobHeader(blob)
-            .BindAsync(data => TryWriteDataAsync(path, blob.Sha[2..], data)));
+                .BindAsync(data => TryWriteDataAsync(path, blob.Sha[2..], data)));
     }
 
     private async Task<Result<byte[]>> AddBlobHeader(Blob blob)
     {
-        var header = Encoding.UTF8.GetBytes($"{GitObjectType.Blob.Value} {blob.Content.Length}\0");    
-        
+        var header = Encoding.UTF8.GetBytes($"{GitObjectType.Blob.Value} {blob.Content.Length}\0");
+
         var result = new byte[header.Length + blob.Content.Length];
         header.CopyTo(result, 0);
         blob.Content.CopyTo(result, header.Length);
         return Result<byte[]>.Success(result);
     }
+
     private Result<string> CreateDirectory(string sha)
     {
-        string directoryPath = Path.Combine(_pathToGitObjectFolder, sha[..2]); 
+        string directoryPath = Path.Combine(_pathToGitObjectFolder, sha[..2]);
         if (!Directory.Exists(directoryPath))
         {
             Directory.CreateDirectory(directoryPath);
         }
+
         return Result<string>.Success(directoryPath);
     }
 
@@ -81,8 +86,122 @@ public class GitService : IGitService
 
     public async Task<Result<Tree>> WriteTreeAsync(string path)
     {
-        //TODO
-        throw new NotImplementedException();
+        var validationResult = ValidateExist(path);
+        if (validationResult.IsFailure)
+            return Result<Tree>.Failure(validationResult.Errors);
+
+        var filesFullNameResult = await GetFilesFullName(path);
+        if (filesFullNameResult.IsFailure)
+            return Result<Tree>.Failure(filesFullNameResult.Errors);
+
+        var directoriesFullNameResult = await GetDirectoriesFullName(path);
+        if (directoriesFullNameResult.IsFailure)
+            return Result<Tree>.Failure(directoriesFullNameResult.Errors);
+        
+        var treeEntries = new List<Tree.TreeEntry>();
+        
+        foreach (var fileFullName in filesFullNameResult.Response)
+        {
+            var blobResult = await GenerateBlobAsync(fileFullName);
+            if (blobResult.IsFailure)
+                return Result<Tree>.Failure(blobResult.Errors);
+            var blob = blobResult.Response;
+            treeEntries.Add(new Tree.FileEntry
+            {
+                Path = Path.GetFileName(fileFullName),
+                Sha = blob.Sha
+            });
+            
+            var writeBlobResult = await WriteBlobInDataBaseAsync(blob);
+            if (writeBlobResult.IsFailure)
+                return Result<Tree>.Failure(writeBlobResult.Errors);
+        }
+      
+        foreach (var directoryFullName in directoriesFullNameResult.Response)
+        {
+            var subTreeResult = await WriteTreeAsync(directoryFullName);
+            if (subTreeResult.IsFailure)
+                return Result<Tree>.Failure(subTreeResult.Errors);
+
+            var subTree = subTreeResult.Response;
+
+            treeEntries.Add(new Tree.DirectoryEntry()
+            {
+                Path = Path.GetFileName(directoryFullName),
+                Sha = subTree.Sha
+            });
+        }
+        var tree = new Tree
+        {
+            Entries = treeEntries
+        };
+
+        // Serialize tree object into the format "mode path\0sha"
+        var treeData = SerializeTree(treeEntries);
+
+        // Step 8: Calculate the SHA for the tree object
+        var shaResult = CalculateSha(treeData);
+        if (shaResult.IsFailure)
+            return Result<Tree>.Failure(shaResult.Errors);
+
+        tree.Sha = shaResult.Response;
+
+        // Step 9: Write the tree to the database (as with blobs)
+        var directoryResult = CreateDirectory(tree.Sha);
+        if (directoryResult.IsFailure)
+            return Result<Tree>.Failure(directoryResult.Errors);
+
+        var writeTreeResult = await TryWriteDataAsync(directoryResult.Response, tree.Sha[2..], treeData);
+        if (writeTreeResult.IsFailure)
+            return Result<Tree>.Failure(writeTreeResult.Errors);
+
+        return Result<Tree>.Success(tree); 
+    }
+    private byte[] SerializeTree(List<Tree.TreeEntry> entries)
+    {
+        using var memoryStream = new MemoryStream();
+
+        foreach (var entry in entries)
+        {
+            // Each entry follows the format "mode path\0sha"
+            var entryLine = $"{entry.Mode} {entry.Path}\0";
+            var entryBytes = Encoding.UTF8.GetBytes(entryLine);
+
+            memoryStream.Write(entryBytes, 0, entryBytes.Length);
+
+            // Write the SHA (as 20 bytes)
+            var shaBytes = Enumerable.Range(0, entry.Sha.Length / 2)
+                .Select(x => Convert.ToByte(entry.Sha.Substring(x * 2, 2), 16))
+                .ToArray();
+            memoryStream.Write(shaBytes, 0, shaBytes.Length);
+        }
+
+        return memoryStream.ToArray();
+    }
+    private Task<Result<List<string>>> GetFilesFullName(string path)
+    {
+        DirectoryInfo directoryInfo = new DirectoryInfo(path);
+        var fileInfos = directoryInfo.EnumerateFiles();
+        var filesName = new List<string>();
+        foreach (var fileInfo in fileInfos)
+        {
+            filesName.Add(fileInfo.FullName);
+        }
+
+        return Task.FromResult(Result<List<string>>.Success(filesName));
+    }
+
+    private Task<Result<List<string>>> GetDirectoriesFullName(string path)
+    {
+        DirectoryInfo directoryInfo = new DirectoryInfo(path);
+        var directoriesInfo = directoryInfo.EnumerateDirectories();
+        var directoriesFullName = new List<string>();
+        foreach (var directoryInfoElement in directoriesInfo)
+        {
+            directoriesFullName.Add(directoryInfoElement.FullName);
+        }
+
+        return Task.FromResult(Result<List<string>>.Success(directoriesFullName));
     }
 
     private async Task<Result<Tree>> TryParseTreeAsync(byte[] data)
@@ -93,7 +212,7 @@ public class GitService : IGitService
             var headerEndIndex = Array.IndexOf(data, (byte)0);
             string header = Encoding.UTF8.GetString(data, 0, headerEndIndex);
             string[] headerParts = header.Split(' ');
-            int index = headerEndIndex+1;
+            int index = headerEndIndex + 1;
 
             while (index < data.Length)
             {
@@ -171,11 +290,11 @@ public class GitService : IGitService
             .Bind(ValidateExist);
     }
 
-    private async Task<Result<None>> TryWriteDataAsync(string path,string fileName, byte[] data)
+    private async Task<Result<None>> TryWriteDataAsync(string path, string fileName, byte[] data)
     {
         return ResultExtensions.TryExecute(() =>
         {
-            using var fileStream = new FileStream(Path.Combine(path,fileName), FileMode.CreateNew);
+            using var fileStream = new FileStream(Path.Combine(path, fileName), FileMode.CreateNew);
             using ZLibStream zLibStream = new ZLibStream(fileStream, CompressionMode.Compress);
             zLibStream.Write(data, 0, data.Length);
             _logger.LogDebug($"File Written to : {path}");
@@ -307,9 +426,20 @@ public class Tree
     public class TreeEntry
     {
         public string Path { get; set; }
-        public string Mode { get; set; } // e.g., '100644' for regular file, '040000' for directory
-        public string Type { get; set; } // 'blob' or 'tree'
+        public virtual string Mode { get; set; } // e.g., '100644' for regular file, '040000' for directory
+        public virtual string Type { get; set; } // 'blob' or 'tree'
         public string Sha { get; set; } // SHA-1 hash of the referenced object
+    }
+
+    public class FileEntry : TreeEntry
+    {
+        public override string Mode { get => "100644"; }
+        public override string Type { get => "blob"; }
+    }
+    public class DirectoryEntry : TreeEntry
+    {
+        public override string Mode { get => "040000"; }
+        public override string Type { get => "tree"; }
     }
 }
 
