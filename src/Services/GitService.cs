@@ -164,23 +164,46 @@ public class GitService : IGitService
     {
         using var memoryStream = new MemoryStream();
 
+        // Sort entries lexicographically by path (file/directory name)
+        entries = entries.OrderBy(entry => entry.Path, StringComparer.Ordinal).ToList();
+
+        // Calculate the exact size of the tree data (excluding the "tree <size>\0" header for now)
+        int totalSize = 0;
         foreach (var entry in entries)
         {
-            // Each entry follows the format "mode path\0sha"
-            var entryLine = $"{entry.Mode} {entry.Path}\0";
-            var entryBytes = Encoding.UTF8.GetBytes(entryLine);
+            // Each entry has the format: "mode path\0" + 20 bytes of SHA-1
+            string entryLine = $"{entry.Mode} {entry.Path}\0";
+            totalSize += Encoding.UTF8.GetByteCount(entryLine) + 20; // 20 bytes for SHA-1
+        }
 
+        // Verify the calculated size
+        _logger.LogDebug($"Total tree size: {totalSize}");
+
+        // Write the "tree <size>\0" header at the beginning
+        string treeHeader = $"tree {totalSize}\0";
+        byte[] headerBytes = Encoding.UTF8.GetBytes(treeHeader);
+        memoryStream.Write(headerBytes, 0, headerBytes.Length);
+
+        // Now write each entry (mode, path, and SHA) to the memory stream
+        foreach (var entry in entries)
+        {
+            // Serialize the mode and path (e.g., "100644 filename\0" or "040000 dirname\0")
+            string entryLine = $"{entry.Mode} {entry.Path}\0";
+            byte[] entryBytes = Encoding.UTF8.GetBytes(entryLine);
             memoryStream.Write(entryBytes, 0, entryBytes.Length);
 
-            // Write the SHA (as 20 bytes)
-            var shaBytes = Enumerable.Range(0, entry.Sha.Length / 2)
+            // Convert the SHA-1 from its hexadecimal string form into raw 20-byte form
+            byte[] shaBytes = Enumerable.Range(0, entry.Sha.Length / 2)
                 .Select(x => Convert.ToByte(entry.Sha.Substring(x * 2, 2), 16))
                 .ToArray();
+
+            // Write the 20 raw bytes of the SHA-1
             memoryStream.Write(shaBytes, 0, shaBytes.Length);
         }
 
         return memoryStream.ToArray();
     }
+
     private Task<Result<List<string>>> GetFilesFullName(string path)
     {
         DirectoryInfo directoryInfo = new DirectoryInfo(path);
@@ -328,13 +351,25 @@ public class GitService : IGitService
 
     private async Task<Result<byte[]>> GenerateBlobData(string path)
     {
-        string content = File.ReadAllText(path);
-        _logger.LogDebug(content);
+        // Read the file as bytes instead of text to handle binary files correctly
+        byte[] content = await File.ReadAllBytesAsync(path);
+        _logger.LogDebug($"File content length: {content.Length}");
 
+        // Prepare the header in the format 'blob {size}\0'
         string header = $"{GitObjectType.Blob.Value} {content.Length}\0";
-        _logger.LogDebug(header);
+        _logger.LogDebug($"Header: {header}");
 
-        return Result<byte[]>.Success(Encoding.UTF8.GetBytes(header + content));
+        // Convert the header to bytes
+        byte[] headerBytes = Encoding.UTF8.GetBytes(header);
+
+        // Create the result array to hold the header + content
+        byte[] result = new byte[headerBytes.Length + content.Length];
+
+        // Copy header and content into the result array
+        Buffer.BlockCopy(headerBytes, 0, result, 0, headerBytes.Length);
+        Buffer.BlockCopy(content, 0, result, headerBytes.Length, content.Length);
+
+        return Result<byte[]>.Success(result);  // Return the combined byte array
     }
 
     private string DetermineType(string mode)
