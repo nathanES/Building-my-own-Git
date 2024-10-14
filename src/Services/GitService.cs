@@ -86,18 +86,22 @@ public class GitService : IGitService
 
     public async Task<Result<Tree>> WriteTreeAsync(string path)
     {
+        _logger.LogDebug($"{nameof(path)} : {path}");
         var validationResult = ValidateExist(path);
         if (validationResult.IsFailure)
             return Result<Tree>.Failure(validationResult.Errors);
+        _logger.LogDebug($"{nameof(validationResult)} : OK");
 
         var filesFullNameResult = await GetFilesFullName(path);
         if (filesFullNameResult.IsFailure)
             return Result<Tree>.Failure(filesFullNameResult.Errors);
+        _logger.LogDebug($"{nameof(filesFullNameResult)} : OK");
 
         var directoriesFullNameResult = await GetDirectoriesFullName(path);
         if (directoriesFullNameResult.IsFailure)
             return Result<Tree>.Failure(directoriesFullNameResult.Errors);
-        
+        _logger.LogDebug($"{nameof(directoriesFullNameResult)} : OK");
+ 
         var treeEntries = new List<Tree.TreeEntry>();
         
         foreach (var fileFullName in filesFullNameResult.Response)
@@ -116,7 +120,8 @@ public class GitService : IGitService
             if (writeBlobResult.IsFailure)
                 return Result<Tree>.Failure(writeBlobResult.Errors);
         }
-      
+        _logger.LogDebug($"{nameof(filesFullNameResult)} : Processed");
+ 
         foreach (var directoryFullName in directoriesFullNameResult.Response)
         {
             var subTreeResult = await WriteTreeAsync(directoryFullName);
@@ -131,29 +136,33 @@ public class GitService : IGitService
                 Sha = subTree.Sha
             });
         }
+        _logger.LogDebug($"{nameof(directoriesFullNameResult)} : Processed");
+
         var tree = new Tree
         {
             Entries = treeEntries
         };
 
-        // Serialize tree object into the format "mode path\0sha"
         var treeData = SerializeTree(treeEntries);
+        _logger.LogDebug($"{nameof(treeData)} : Serialized");
 
-        // Step 8: Calculate the SHA for the tree object
         var shaResult = CalculateSha(treeData);
         if (shaResult.IsFailure)
             return Result<Tree>.Failure(shaResult.Errors);
+        _logger.LogDebug($"{nameof(shaResult)} : OK");
+
 
         tree.Sha = shaResult.Response;
 
-        // Step 9: Write the tree to the database (as with blobs)
         var directoryResult = CreateDirectory(tree.Sha);
         if (directoryResult.IsFailure)
             return Result<Tree>.Failure(directoryResult.Errors);
+        _logger.LogDebug($"{nameof(directoryResult)} : Created");
 
         var writeTreeResult = await TryWriteDataAsync(directoryResult.Response, tree.Sha[2..], treeData);
         if (writeTreeResult.IsFailure)
             return Result<Tree>.Failure(writeTreeResult.Errors);
+        _logger.LogDebug($"{nameof(writeTreeResult)} : Writed");
 
         return Result<Tree>.Success(tree); 
     }
