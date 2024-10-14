@@ -171,13 +171,13 @@ public class GitService : IGitService
         int totalSize = 0;
         foreach (var entry in entries)
         {
+            // Correct the mode formatting: remove the leading '0' for directories
+            string correctedMode = entry.Mode == "040000" ? "40000" : entry.Mode;
+        
             // Each entry has the format: "mode path\0" + 20 bytes of SHA-1
-            string entryLine = $"{entry.Mode} {entry.Path}\0";
+            string entryLine = $"{correctedMode} {entry.Path}\0";
             totalSize += Encoding.UTF8.GetByteCount(entryLine) + 20; // 20 bytes for SHA-1
         }
-
-        // Verify the calculated size
-        _logger.LogDebug($"Total tree size: {totalSize}");
 
         // Write the "tree <size>\0" header at the beginning
         string treeHeader = $"tree {totalSize}\0";
@@ -187,8 +187,11 @@ public class GitService : IGitService
         // Now write each entry (mode, path, and SHA) to the memory stream
         foreach (var entry in entries)
         {
-            // Serialize the mode and path (e.g., "100644 filename\0" or "040000 dirname\0")
-            string entryLine = $"{entry.Mode} {entry.Path}\0";
+            // Correct the mode formatting: remove the leading '0' for directories
+            string correctedMode = entry.Mode == "040000" ? "40000" : entry.Mode;
+
+            // Serialize the mode and path (e.g., "100644 filename\0" or "40000 dirname\0")
+            string entryLine = $"{correctedMode} {entry.Path}\0";
             byte[] entryBytes = Encoding.UTF8.GetBytes(entryLine);
             memoryStream.Write(entryBytes, 0, entryBytes.Length);
 
@@ -203,6 +206,7 @@ public class GitService : IGitService
 
         return memoryStream.ToArray();
     }
+
 
     private Task<Result<List<string>>> GetFilesFullName(string path)
     {
@@ -378,7 +382,7 @@ public class GitService : IGitService
         {
             return "blob";
         }
-        else if (mode == "040000")
+        else if (mode == "040000" || mode == "40000")
         {
             return "tree";
         }
