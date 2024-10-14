@@ -35,4 +35,5 @@ app.AddCommands<GitInitCommand>();
 app.AddCommands<GitCatFileCommand>();
 app.AddCommands<GitHashObjectCommand>();
 app.AddCommands<GitLsTreeCommand>();
+app.AddCommands<GitWriteTreeCommand>();
 app.Run();

@@ -14,6 +14,7 @@ public interface IGitService
     Task<Result<Tree>> GetTreeAsync(string sha);
     Task<Result<None>> WriteBlobInDataBaseAsync(Blob blob);
     Task<Result<Blob>> GenerateBlobAsync(string path);
+    Task<Result<Tree>> WriteTreeAsync(string path);
 }
 
 public class GitService : IGitService
@@ -76,6 +77,12 @@ public class GitService : IGitService
         return await ValidateExist(path)
             .BindAsync(GenerateBlobData)
             .BindAsync(TryParseBlobAsync);
+    }
+
+    public async Task<Result<Tree>> WriteTreeAsync(string path)
+    {
+        //TODO
+        throw new NotImplementedException();
     }
 
     private async Task<Result<Tree>> TryParseTreeAsync(byte[] data)
