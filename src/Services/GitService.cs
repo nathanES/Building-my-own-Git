@@ -197,7 +197,7 @@ public class GitService : IGitService
     private Task<Result<List<string>>> GetDirectoriesFullName(string path)
     {
         DirectoryInfo directoryInfo = new DirectoryInfo(path);
-        var directoriesInfo = directoryInfo.EnumerateDirectories();
+        var directoriesInfo = directoryInfo.EnumerateDirectories().Where(x=> x.Name !=".git");
         var directoriesFullName = new List<string>();
         foreach (var directoryInfoElement in directoriesInfo)
         {

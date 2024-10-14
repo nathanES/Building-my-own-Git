@@ -28,7 +28,9 @@ public class GitWriteTreeCommand
             return;
         }
 
-        string currentDirectory = currentDirectoryResult.Response;
+        string currentDirectory = currentDirectoryResult.Response + "/Test";
+            //currentDirectoryResult.Response;
+        
 #else
         string currentDirectory = Directory.GetCurrentDirectory();
 #endif
