@@ -4,6 +4,7 @@ using System.Text.Json;
 using Cocona;
 using codecrafters_git.ResultPattern;
 using codecrafters_git.Services;
+using codecrafters_git.Services.GitObjects;
 using codecrafters_git.Utils;
 using Microsoft.Extensions.Logging;
 

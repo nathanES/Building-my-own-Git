@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Net.Mime;
 using System.Runtime.CompilerServices;
@@ -6,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using codecrafters_git.ResultPattern;
+using codecrafters_git.Services.GitObjects;
 using Microsoft.CSharp.RuntimeBinder;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +20,7 @@ public interface IGitService
     Task<Result<None>> WriteBlobInDataBaseAsync(Blob blob);
     Task<Result<Blob>> GenerateBlobAsync(string path);
     Task<Result<Tree>> WriteTreeAsync(string path);
+    Task<Result<string>> CommitTreeAsync(string treeSha, string parentSha, string message);
 }
 
 public class GitService : IGitService
@@ -145,7 +148,6 @@ public class GitService : IGitService
             return Result<Tree>.Failure(shaResult.Errors);
         _logger.LogDebug($"{nameof(shaResult)} : OK");
 
-
         tree.Sha = shaResult.Response;
 
         var directoryResult = CreateDirectory(tree.Sha);
@@ -160,6 +162,68 @@ public class GitService : IGitService
 
         return Result<Tree>.Success(tree); 
     }
+
+    public async Task<Result<string>> CommitTreeAsync(string treeSha, string parentSha, string message)
+    {
+        // Step 1: Get the author information (for simplicity, we'll hard-code it here)
+        string authorName = "Author Name";
+        string authorEmail = "author@example.com";
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string timestamp = $"{now.ToUnixTimeSeconds()} {now.Offset.Hours:+00;-00}00";
+
+        // Step 2: Create the commit object content
+        var commitContent = new StringBuilder();
+        commitContent.AppendLine($"tree {treeSha}");
+    
+        // Add parent commits if any
+        if (!string.IsNullOrEmpty(parentSha))
+        {
+            commitContent.AppendLine($"parent {parentSha}");
+        }
+    
+        // Add author and committer information
+        commitContent.AppendLine($"author {authorName} <{authorEmail}> {timestamp}");
+        commitContent.AppendLine($"committer {authorName} <{authorEmail}> {timestamp}");
+    
+        // Add commit message
+        commitContent.AppendLine();
+        commitContent.AppendLine(message);
+
+        // Step 3: Serialize the commit object with a header
+        string content = commitContent.ToString();
+        string commitHeader = $"commit {content.Length}\0";
+        string fullCommit = commitHeader + content;
+
+        // Step 4: Calculate the SHA-1 hash of the serialized commit
+        SHA1 sha1 = SHA1.Create();
+        byte[] commitBytes = Encoding.UTF8.GetBytes(fullCommit);
+        byte[] hashBytes = sha1.ComputeHash(commitBytes);
+        string sha = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+
+        // Step 5: Write the commit object to the Git object database
+        WriteGitObject(sha, fullCommit);
+
+        // Step 6: Return the commit SHA-1 as a result
+        return Result<string>.Success(sha);
+    }
+    private void WriteGitObject(string sha, string content)
+    {
+        string objectDirectory = Path.Combine(_pathToGitObjectFolder, sha.Substring(0, 2));
+        string objectFile = Path.Combine(objectDirectory, sha.Substring(2));
+
+        if (!Directory.Exists(objectDirectory))
+        {
+            Directory.CreateDirectory(objectDirectory);
+        }
+
+        using (FileStream fs = new FileStream(objectFile, FileMode.Create))
+        using (var zlibStream = new ZLibStream(fs, CompressionMode.Compress))
+        {
+            byte[] commitBytes = Encoding.UTF8.GetBytes(content);
+            zlibStream.Write(commitBytes, 0, commitBytes.Length);
+        }
+    }
+
     private byte[] SerializeTree(List<Tree.TreeEntry> entries)
     {
         using var memoryStream = new MemoryStream();
@@ -264,7 +328,7 @@ public class GitService : IGitService
                 index = nullIndex + 21; // Move to the next entry start
             }
 
-            tree.Sha = CalculateSha(data).Response; // Optionally calculate SHA of the whole tree
+            tree.Sha = CalculateSha(data).Response; 
             return Result<Tree>.Success(tree);
         }
         catch (Exception ex)
@@ -382,7 +446,7 @@ public class GitService : IGitService
         {
             return "blob";
         }
-        else if (mode == "040000" || mode == "40000")
+        else if (mode is "040000" or "40000")
         {
             return "tree";
         }
@@ -458,35 +522,4 @@ public class GitObjectType
     {
         Value = value;
     }
-}
-
-public class Tree
-{
-    public List<TreeEntry> Entries { get; set; } = new List<TreeEntry>();
-    public string Sha { get; set; } // Unique hash of the structure
-
-    public class TreeEntry
-    {
-        public string Path { get; set; }
-        public virtual string Mode { get; set; } // e.g., '100644' for regular file, '040000' for directory
-        public virtual string Type { get; set; } // 'blob' or 'tree'
-        public string Sha { get; set; } // SHA-1 hash of the referenced object
-    }
-
-    public class FileEntry : TreeEntry
-    {
-        public override string Mode { get => "100644"; }
-        public override string Type { get => "blob"; }
-    }
-    public class DirectoryEntry : TreeEntry
-    {
-        public override string Mode { get => "040000"; }
-        public override string Type { get => "tree"; }
-    }
-}
-
-public class Blob
-{
-    public byte[] Content { get; set; }
-    public string Sha { get; set; } // Unique hash of the Content
 }

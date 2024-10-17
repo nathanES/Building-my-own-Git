@@ -1,4 +1,4 @@
-namespace codecrafters_git.Services;
+namespace codecrafters_git.Services.GitObjects;
 
 public class Tree
 {
