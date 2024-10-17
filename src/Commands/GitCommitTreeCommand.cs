@@ -12,7 +12,6 @@ public class GitCommitTreeCommand(ILogger logger, IGitService gitService)
     private readonly ILogger _logger = logger;
     private readonly IGitService _gitService = gitService;
 
-    //$ ./your_program.sh commit-tree <tree_sha> -p <commit_sha> -m <message>
     [Command("commit-tree", Description = "Git commit-tree command")]
     public async Task GitCommitTree([Argument(Description = "Tree Sha")] string treeSha, 
         [Option('p', Description = "Commit Sha")] string commitSha, 

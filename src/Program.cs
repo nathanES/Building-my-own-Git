@@ -37,4 +37,6 @@ app.AddCommands<GitHashObjectCommand>();
 app.AddCommands<GitLsTreeCommand>();
 app.AddCommands<GitWriteTreeCommand>();
 app.AddCommands<GitCommitTreeCommand>();
+app.AddCommands<GitCloneCommand>();
+
 app.Run();
