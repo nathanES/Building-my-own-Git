@@ -223,7 +223,6 @@ public class GitService : IGitService
             zlibStream.Write(commitBytes, 0, commitBytes.Length);
         }
     }
-
     private byte[] SerializeTree(List<Tree.TreeEntry> entries)
     {
         using var memoryStream = new MemoryStream();
@@ -270,8 +269,6 @@ public class GitService : IGitService
 
         return memoryStream.ToArray();
     }
-
-
     private Task<Result<List<string>>> GetFilesFullName(string path)
     {
         DirectoryInfo directoryInfo = new DirectoryInfo(path);
@@ -284,7 +281,6 @@ public class GitService : IGitService
 
         return Task.FromResult(Result<List<string>>.Success(filesName));
     }
-
     private Task<Result<List<string>>> GetDirectoriesFullName(string path)
     {
         DirectoryInfo directoryInfo = new DirectoryInfo(path);
@@ -297,7 +293,6 @@ public class GitService : IGitService
 
         return Task.FromResult(Result<List<string>>.Success(directoriesFullName));
     }
-
     private async Task<Result<Tree>> TryParseTreeAsync(byte[] data)
     {
         try
@@ -336,7 +331,6 @@ public class GitService : IGitService
             return Result<Tree>.Failure(GitServiceErrors.TreeParseError(ex.Message));
         }
     }
-
     private async Task<Result<Blob>> TryParseBlobAsync(byte[] data)
     {
         try
@@ -362,7 +356,6 @@ public class GitService : IGitService
             return Result<Blob>.Failure(GitServiceErrors.BlobParseError(ex.Message));
         }
     }
-
     private async Task<Result<byte[]>> ReadGitObjectAsync(string sha)
     {
         return await ValidateAndRetrievePath(sha)
